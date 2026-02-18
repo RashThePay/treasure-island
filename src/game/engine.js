@@ -333,11 +333,12 @@ class Game {
         p.actionData = null;
         p.vote = null;
       });
-      // Reset successful attack flag for next round's cabin boy check
-      // Actually, "successfulAttackLastNight" refers to the PREVIOUS night.
-      // So we update it now.
-      Object.values(this.ships).forEach(s => {
-        // We'll set this during resolveAttack
+      // Update successful attack flag for next round's cabin boy check
+      Object.values(this.ships).forEach(ship => {
+        const captain = ship.getCaptain();
+        if (!captain || captain.action !== ACTIONS.ATTACK) {
+          ship.successfulAttackLastNight = false;
+        }
       });
     }
 

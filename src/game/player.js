@@ -23,11 +23,8 @@ class Player {
   }
 
   isCabinBoy(crewCount) {
-    if (crewCount === 1) return true;
-    if (crewCount === 2) return this.rank === 2;
-    // Find the highest rank number (which is the lowest rank)
-    // This will be handled by the Ship/Island class
-    return false;
+    if (crewCount === 0) return false;
+    return this.rank === crewCount;
   }
 
   isGovernor() {

@@ -11,14 +11,33 @@ class TreasureIslandBot {
   }
 
   setupHandlers() {
-    this.bot.command('start_game', (ctx) => this.handleJoin(ctx));
+    this.bot.telegram.setMyCommands([
+      { command: 'new_game', description: 'ساخت بازی جدید' },
+      { command: 'join', description: 'پیوستن به بازی' },
+      { command: 'start', description: 'شروع بازی' },
+      { command: 'stop', description: 'توقف و حذف بازی' },
+      { command: 'help', description: 'راهنمای بازی' }
+    ]);
+
+    this.bot.command('new_game', (ctx) => this.handleNewGame(ctx));
     this.bot.command('join', (ctx) => this.handleJoin(ctx));
     this.bot.command('start', (ctx) => {
       if (ctx.chat.type === 'private') {
-        ctx.reply('سلام! من ربات بازی جزیره گنج هستم. برای شروع بازی باید در یک گروه دستور /join را بزنید.');
+        ctx.reply('سلام! من ربات بازی جزیره گنج هستم. برای شروع بازی باید در یک گروه از دستورات /new_game و /join استفاده کنید.');
       } else {
         this.handleStart(ctx);
       }
+    });
+    this.bot.command('stop', (ctx) => this.handleStop(ctx));
+    this.bot.command('help', (ctx) => {
+      ctx.reply(`🏴‍☠️ *راهنمای بازی جزیره گنج*
+
+1. ابتدا با دستور /new_game بازی را بسازید.
+2. حالت بازی (عادی یا مه‌گرفتگی) را انتخاب کنید.
+3. سایر بازیکنان با /join وارد شوند (حداقل ۴ نفر).
+4. با دستور /start بازی را شروع کنید.
+
+جزئیات نقش‌ها و اقدامات در پی‌وی ربات برای شما ارسال خواهد شد.`, { parse_mode: 'Markdown' });
     });
 
     this.bot.action('act_choose_move', async (ctx) => {
@@ -42,13 +61,26 @@ class TreasureIslandBot {
     this.bot.on('callback_query', (ctx) => this.handleCallback(ctx));
   }
 
+  async handleNewGame(ctx) {
+    if (ctx.chat.type === 'private') return;
+    const chatId = ctx.chat.id;
+    if (this.games.has(chatId)) {
+      return ctx.reply('یک بازی در این گروه در حال جریان است.');
+    }
+
+    this.games.set(chatId, new Game(chatId));
+    ctx.reply('🎮 بازی جدید ساخته شد!\nلطفاً حالت بازی را انتخاب کنید:', Markup.inlineKeyboard([
+      [Markup.button.callback('عادی ☀️', 'fog_off'), Markup.button.callback('مه‌گرفتگی 🌫', 'fog_on')]
+    ]));
+  }
+
   async handleJoin(ctx) {
     if (ctx.chat.type === 'private') return;
     const chatId = ctx.chat.id;
-    if (!this.games.has(chatId)) {
-      this.games.set(chatId, new Game(chatId));
-    }
     const game = this.games.get(chatId);
+    if (!game) {
+      return ctx.reply('ابتدا باید با /new_game یک بازی بسازید.');
+    }
     if (game.phase !== PHASES.LOBBY) {
       return ctx.reply('بازی در حال حاضر شروع شده است.');
     }
@@ -57,7 +89,7 @@ class TreasureIslandBot {
     const userName = ctx.from.first_name;
     if (game.addPlayer(userId, userName)) {
       this.playerGames.set(userId, chatId);
-      ctx.reply(`${userName} به بازی پیوست. (تعداد بازیکنان: ${game.players.size})`);
+      ctx.reply(`${userName} به بازی پیوست. (تعداد بازیکنان: ${game.players.size}/10)`);
     } else {
       ctx.reply('شما قبلاً عضو شده‌اید یا ظرفیت بازی تکمیل است.');
     }
@@ -66,17 +98,33 @@ class TreasureIslandBot {
   async handleStart(ctx) {
     const chatId = ctx.chat.id;
     const game = this.games.get(chatId);
-    if (!game || game.phase !== PHASES.LOBBY) return;
+    if (!game) return;
+    if (game.phase !== PHASES.LOBBY) return;
     if (!game.players.has(ctx.from.id)) return;
 
     if (game.players.size < 4) {
       return ctx.reply('برای شروع بازی حداقل به ۴ نفر نیاز است.');
     }
 
-    // Ask for Fog Mode
-    ctx.reply('آیا می‌خواهید حالت مه‌گرفتگی (Fog Mode) فعال باشد؟', Markup.inlineKeyboard([
-      [Markup.button.callback('بله ✅', 'fog_on'), Markup.button.callback('خیر ❌', 'fog_off')]
-    ]));
+    if (game.fogMode === undefined) {
+        return ctx.reply('لطفاً ابتدا حالت بازی (مه‌گرفتگی یا عادی) را انتخاب کنید.');
+    }
+
+    game.startGame(game.fogMode);
+    ctx.reply(`بازی با ${game.players.size} بازیکن شروع شد! (حالت: ${game.fogMode ? 'مه‌گرفتگی' : 'عادی'})`);
+    this.announceRoles(game);
+    this.startPreGame(game);
+  }
+
+  async handleStop(ctx) {
+    const chatId = ctx.chat.id;
+    const game = this.games.get(chatId);
+    if (!game) return;
+
+    // In a real scenario, you might want to restrict this to admins or the host
+    game.players.forEach((_, id) => this.playerGames.delete(id));
+    this.games.delete(chatId);
+    ctx.reply('🛑 بازی متوقف شد.');
   }
 
   async handleCallback(ctx) {
@@ -89,10 +137,8 @@ class TreasureIslandBot {
 
     if (data === 'fog_on' || data === 'fog_off') {
       if (game.phase !== PHASES.LOBBY) return;
-      game.startGame(data === 'fog_on');
-      await ctx.editMessageText(`بازی با موفقیت شروع شد! (حالت مه‌گرفتگی: ${game.fogMode ? 'فعال' : 'غیرفعال'})`);
-      this.announceRoles(game);
-      this.startPreGame(game);
+      game.fogMode = (data === 'fog_on');
+      await ctx.editMessageText(`حالت بازی انتخاب شد: ${game.fogMode ? 'مه‌گرفتگی 🌫' : 'عادی ☀️'}\nاکنون بازیکنان می‌توانند با /join وارد شوند و سپس یکی از اعضا /start را بزند.`);
       return;
     }
 
@@ -116,6 +162,8 @@ class TreasureIslandBot {
       const parts = data.split('_');
       const action = parts[1];
       const target = parts[2];
+
+      if (action === 'choose') return ctx.answerCbQuery();
 
       // Special handling for actions that need more data (like Exile target or Move target)
       if (action === ACTIONS.MOVE) {
@@ -335,6 +383,9 @@ class TreasureIslandBot {
     }
 
     this.bot.telegram.sendMessage(game.chatId, msg, { parse_mode: 'Markdown' });
+
+    // Clean up player mappings
+    game.players.forEach((_, id) => this.playerGames.delete(id));
     this.games.delete(game.chatId);
   }
 

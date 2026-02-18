@@ -1,0 +1,48 @@
+module.exports = {
+  TEAMS: {
+    ENGLISH: 'ENGLISH',
+    FRENCH: 'FRENCH',
+    DUTCH: 'DUTCH',
+    SPANISH: 'SPANISH',
+  },
+  LOCATIONS: {
+    FLYING_DUTCHMAN: 'FLYING_DUTCHMAN',
+    JOLLY_ROGER: 'JOLLY_ROGER',
+    ISLAND: 'ISLAND',
+    SPANISH_SHIP: 'SPANISH_SHIP',
+  },
+  WAREHOUSES: {
+    ENGLISH: 'ENGLISH',
+    FRENCH: 'FRENCH',
+  },
+  PHASES: {
+    LOBBY: 'LOBBY',
+    PRE_GAME: 'PRE_GAME',
+    DAY: 'DAY',
+    NIGHT: 'NIGHT',
+    GAME_OVER: 'GAME_OVER',
+  },
+  ACTIONS: {
+    MOVE: 'MOVE',
+    TREASURE_MOVE: 'TREASURE_MOVE',
+    MUTINY: 'MUTINY',
+    ATTACK: 'ATTACK',
+    EXILE: 'EXILE',
+    CONFLICT: 'CONFLICT',
+    CALL_FLEET: 'CALL_FLEET',
+    CHECK_WAREHOUSE: 'CHECK_WAREHOUSE',
+    PASS: 'PASS',
+  },
+  VOTES: {
+    // Attack votes
+    RAID: 'RAID',
+    FIRE: 'FIRE',
+    EXTINGUISH: 'EXTINGUISH',
+    // Mutiny votes
+    SUPPORT: 'SUPPORT',
+    OPPOSE: 'OPPOSE',
+    // Conflict votes
+    VOTE_ENGLISH: 'VOTE_ENGLISH',
+    VOTE_FRENCH: 'VOTE_FRENCH',
+  }
+};

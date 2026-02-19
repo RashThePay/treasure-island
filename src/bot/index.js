@@ -166,23 +166,26 @@ class TreasureIslandBot {
       if (action === 'choose') return ctx.answerCbQuery();
 
       // Special handling for actions that need more data (like Exile target or Move target)
+      const player = game.players.get(userId);
+      let actionData = null;
+      let announcement = null;
+
       if (action === ACTIONS.MOVE) {
-        game.submitAction(userId, action, { target });
-        await ctx.editMessageText(`اقدام حرکت به ${game.getLocationName(target)} ثبت شد.`);
-        this.checkDayProgress(game);
+        if (!target) return ctx.answerCbQuery();
+        actionData = { target };
+        announcement = `${player.name} اقدام به حرکت به سمت ${game.getLocationName(target)} کرد.`;
       } else if (action === ACTIONS.EXILE) {
         if (!target) {
-            // Show list of crew members to exile
-            const ship = game.ships[game.players.get(userId).location];
+            const ship = game.ships[player.location];
             const buttons = ship.crew.filter(p => p.id !== userId).map(p =>
                 [Markup.button.callback(p.name, `act_EXILE_${p.id}`)]
             );
             await ctx.editMessageText('چه کسی را می‌خواهید اخراج کنید؟', Markup.inlineKeyboard(buttons));
             return;
         } else {
-            game.submitAction(userId, action, { targetId: parseInt(target) });
-            await ctx.editMessageText(`اقدام اخراج ${game.players.get(parseInt(target)).name} ثبت شد.`);
-            this.checkDayProgress(game);
+            const targetPlayer = game.players.get(parseInt(target));
+            actionData = { targetId: parseInt(target) };
+            announcement = `${player.name} اقدام به اخراج ${targetPlayer.name} کرد.`;
         }
       } else if (action === ACTIONS.ATTACK) {
           if (!target) {
@@ -192,9 +195,9 @@ class TreasureIslandBot {
              ]));
              return;
           } else {
-             game.submitAction(userId, action, { warehouse: target });
-             await ctx.editMessageText(`دستور حمله به انبار ${game.getWarehouseName(target)} ثبت شد.`);
-             this.checkDayProgress(game);
+             actionData = { warehouse: target };
+             const whText = game.fogMode ? 'نامشخص' : game.getWarehouseName(target);
+             announcement = `${player.name} دستور حمله صادر کرد و انبار مقصد را ${whText} انتخاب کرد.`;
           }
       } else if (action === ACTIONS.TREASURE_MOVE) {
           if (parts.length === 2) {
@@ -206,15 +209,17 @@ class TreasureIslandBot {
           } else if (parts.length === 3) {
               const from = parts[2];
               const to = from === WAREHOUSES.ENGLISH ? WAREHOUSES.FRENCH : WAREHOUSES.ENGLISH;
-              game.submitAction(userId, action, { from, to });
-              await ctx.editMessageText(`جابه‌جایی گنج از ${game.getWarehouseName(from)} به ${game.getWarehouseName(to)} ثبت شد.`);
-              this.checkDayProgress(game);
+              actionData = { from, to };
+              announcement = `${player.name} اقدام به جابه‌جایی گنج کرد.`;
           }
       } else {
-          game.submitAction(userId, action);
-          await ctx.editMessageText(`اقدام ${this.getActionName(action)} ثبت شد.`);
-          this.checkDayProgress(game);
+          announcement = `${player.name} اقدام ${this.getActionName(action)} را انتخاب کرد.`;
       }
+
+      game.submitAction(userId, action, actionData);
+      await ctx.editMessageText(`اقدام شما ثبت شد.`);
+      this.bot.telegram.sendMessage(game.chatId, `📢 ${announcement}`);
+      this.checkDayProgress(game);
     }
 
     if (data.startsWith('vote_')) {

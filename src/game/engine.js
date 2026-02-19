@@ -248,17 +248,19 @@ class Game {
     // 2. Treasure Move (Cabin Boy)
     players.filter(p => p.action === ACTIONS.TREASURE_MOVE).forEach(p => {
       const ship = this.ships[p.location];
+      if (this.fogMode) {
+        roundLogs.push(`${p.name} پادو کشتی قصد جابه‌جایی گنج را داشت.`);
+      }
+
       if (ship.successfulAttackLastNight) {
-        roundLogs.push(`${p.name} به دلیل حمله موفق دیشب، نتوانست گنج را جابه‌جا کند.`);
+        if (!this.fogMode) roundLogs.push(`${p.name} به دلیل حمله موفق دیشب، نتوانست گنج را جابه‌جا کند.`);
         return;
       }
       const { from, to } = p.actionData;
       if (ship.warehouses[from] > 0) {
         ship.warehouses[from]--;
         ship.warehouses[to]++;
-        if (this.fogMode) {
-            roundLogs.push(`${p.name} یک گنج را در ${ship.name} جابه‌جا کرد. (جزئیات مخفی)`);
-        } else {
+        if (!this.fogMode) {
             roundLogs.push(`${p.name} یک گنج را از انبار ${this.getWarehouseName(from)} به ${this.getWarehouseName(to)} در ${ship.name} جابه‌جا کرد.`);
         }
       }
@@ -309,6 +311,9 @@ class Game {
     const conflictAction = players.find(p => p.action === ACTIONS.CONFLICT);
     if (conflictAction) {
       this.resolveConflict(roundLogs);
+    } else {
+      // If no conflict, governor still potentially loses power if Dutch/Spanish in normal mode?
+      // Actually rules say "پس از هر منازعه". So if no conflict, nothing happens.
     }
 
     // 6. Call Fleet
@@ -424,6 +429,10 @@ class Game {
     // Special roles and Fog mode governor rules
     if (governor) {
       const isSpecial = governor.team === TEAMS.DUTCH || governor.team === TEAMS.SPANISH;
+
+      // In Fog Mode, special roles can maintain governorship by voting for the winner.
+      // governorLost is already set based on whether they voted for the winner or tie happened.
+
       if (!this.fogMode && isSpecial) {
         governorLost = true; // Dutch/Spanish always lose governor after conflict in normal mode
       }
